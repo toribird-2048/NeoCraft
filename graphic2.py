@@ -4,7 +4,7 @@ import quaternion
 import sys
 import pytest
 
-#視界に入る立体範囲:view_solid
+#視界に入る立体範囲（視界立体）:view_solid
 
 
 rng = np.random.default_rng()
@@ -63,7 +63,7 @@ class Line:
         return self.point2
 
 class Camera:
-    def __init__(self, first_abs_coordinate, camera_coordinate_axises, screen_size, max_visibility, max_alpha, screen_distance):
+    def __init__(self, first_abs_coordinate, camera_coordinate_axises, aspect_ratio, max_visibility, FOV, max_alpha, screen_distance):
         self.abs_coordinate = first_abs_coordinate
         self.camera_coordinate_axises = {
             "w": camera_coordinate_axises[0],
@@ -71,8 +71,9 @@ class Camera:
             "y": camera_coordinate_axises[2],
             "z": camera_coordinate_axises[3],
         }
-        self.screen_size = screen_size
+        self.screen_size = np.array((1, aspect_ratio[1]/ aspect_ratio[0]))
         self.max_visibility = max_visibility
+        self.FOV = FOV
         self.max_alpha = max_alpha
         self.screen_distance = screen_distance
 
@@ -137,20 +138,15 @@ class Camera:
         return max((self.max_visibility - distance) / self.max_visibility, 0) * self.max_alpha
 
     def camera_coordinate_to_screen_coordinate(self, point_camera_coordinate):
-        print(f"point_camera_coordinate:{point_camera_coordinate}")
-        try :
-            assert np.dot(point_camera_coordinate, self.camera_coordinate_axises["z"]) > 1e-10
-        except AssertionError:
-            print("エラー：カメラ座標からスクリーン座標への変換に失敗しました。")
         point_screen_coordinate_x = np.dot(point_camera_coordinate,self.camera_coordinate_axises["x"]) * self.screen_distance / np.dot(point_camera_coordinate, self.camera_coordinate_axises["z"])
         point_screen_coordinate_x = point_screen_coordinate_x * 2 / self.screen_size[0]
         point_screen_coordinate_y = np.dot(point_camera_coordinate,self.camera_coordinate_axises["y"]) * self.screen_distance / np.dot(point_camera_coordinate, self.camera_coordinate_axises["z"])
-        point_screen_coordinate_y = point_screen_coordinate_y * 2 / self.screen_size[1]
+        point_screen_coordinate_y = point_screen_coordinate_y * 2 / self.screen_size[0]
         point_screen_coordinate = np.array((point_screen_coordinate_x, point_screen_coordinate_y))
         return point_screen_coordinate
 
-    def is_point_in_front(self, point_camera_coordinate):
-        return np.dot(point_camera_coordinate, self.camera_coordinate_axises["z"]) > 0
+    def is_point_in_vision(self, point_camera_coordinate): #カメラ前方(視野角内)
+        return np.dot(point_camera_coordinate, self.camera_coordinate_axises["z"]) / np.linalg.norm(point_camera_coordinate) > np.cos(self.FOV)
 
     def is_in_view_solid(self, point_camera_coordinate):
         tolerance = 1e-6
@@ -163,7 +159,7 @@ class Camera:
         for point_set in point_sets:
             for point in point_set:
                 point_camera_coordinate = point.get_abs_coordinate() - self.abs_coordinate
-                if self.is_point_in_front(point_camera_coordinate):
+                if self.is_point_in_vision(point_camera_coordinate):
                     if self.is_in_view_solid(point_camera_coordinate): #FractalContinueNote1_α_参照
                         point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point_camera_coordinate)
                         point_radius = point.get_radius()
@@ -172,10 +168,19 @@ class Camera:
                         point_screen_coordinates.append(point_screen_coordinate)
                         point_radiuses.append(point_radius)
                         point_colors.append(color)
-        draw_point(screen=screen, pygame_screen_size=pygame_screen_size, point_screen_coordinates=point_screen_coordinates, point_radiuses=point_radiuses, colors=point_colors)
+        draw_points(screen=screen, pygame_screen_size=pygame_screen_size, point_screen_coordinates=point_screen_coordinates, point_radiuses=point_radiuses, colors=point_colors)
 
 
     def draw_line_sets_screen_coordinate(self, screen, pygame_screen_size, line_sets:list[list[Line]]):
+        line_point1_screen_coordinates = []
+        line_point2_screen_coordinates = []
+        line_widthes = []
+        line_colors = []
+
+        points = []
+        point_abs_coordinates = []
+        point_radiuses = []
+        point_colors = []
         for line_set in line_sets:
             for line in line_set:
                 point1_abs_coordinate = line.get_point1().get_abs_coordinate()
@@ -183,59 +188,104 @@ class Camera:
                 point1_camera_coordinate = point1_abs_coordinate - self.abs_coordinate
                 point2_camera_coordinate = point2_abs_coordinate - self.abs_coordinate
                 camera_coordinate_axises = self.camera_coordinate_axises
-                #---ここから---
-                if np.dot(point2_camera_coordinate, camera_coordinate_axises["w"]) != 0 and np.dot((point1_camera_coordinate - point2_camera_coordinate), camera_coordinate_axises["w"]) == 0: #tが不能
-                    print("不能")
-                    pass
-                elif np.dot(point2_camera_coordinate, camera_coordinate_axises["w"]) == 0 and np.dot((point1_camera_coordinate - point2_camera_coordinate), camera_coordinate_axises["w"]) == 0: #tが不定
-                    print(f"otherpoint:{line.get_point1().get_abs_coordinate()}")
-                    if np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["z"]) == 0:
-                        self.draw_point_sets_screen_coordinate(screen, pygame_screen_size, [[line.get_point1()]])
-                        print("==0")
+
+                if self.is_point_in_vision(point1_camera_coordinate) and self.is_point_in_vision(point2_camera_coordinate): #線の始点と終点が両方視線ベクトル方向にある
+                    if self.is_in_view_solid(point1_camera_coordinate) and self.is_in_view_solid(point2_camera_coordinate): #線の視点と終点が視界立体の内側にある
+                        start_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point1_camera_coordinate)
+                        end_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point2_camera_coordinate)
+                        start_point_abs_coordinate = point1_abs_coordinate
+                        end_point_abs_coordinate = point2_abs_coordinate
+                        line_point1_screen_coordinates.append(start_point_screen_coordinate)
+                        line_point2_screen_coordinates.append(end_point_screen_coordinate)
+                        line_widthes.append(line.width)
+                        line_colors.append(line.color)
+                        point_abs_coordinates.append(start_point_abs_coordinate)
+                        point_abs_coordinates.append(end_point_abs_coordinate)
+                        point_radiuses.append(line.width)
+                        point_radiuses.append(line.width)
+                        point_colors.append(line.color)
+                        point_colors.append(line.color)
+                        print(1)
                     else:
-                        #---ここまでがtの値による場合分けを使ったw方向クリッピング---
-                        #---ここから---
-                        s = np.dot(point2_camera_coordinate, camera_coordinate_axises["z"]) / np.dot(
-                            point2_camera_coordinate - point1_camera_coordinate, camera_coordinate_axises["z"])
-                        if 0 <= s <= 1:
-                            print(f"s:{s}")
-                            if np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["z"]) > 0:
-                                s += 0.01 #微調整 4次元の視界の境界に位置し、計算がおかしくなるのを防ぐ
-                                point_camera_coordinate = s * point1_camera_coordinate + (1 - s) * point2_camera_coordinate
-                                print(f"point_camera_coordinate:{point_camera_coordinate}")
-                                start_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point_camera_coordinate)
-                                end_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point2_camera_coordinate)
-                                print(">0")
-                            elif np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["z"]) < 0:
-                                s -= 0.01
-                                point_camera_coordinate = s * point1_camera_coordinate + (1 - s) * point2_camera_coordinate
-                                start_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point_camera_coordinate)
-                                end_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point1_camera_coordinate)
-
-                                print("<0")
-                            else:
-                                raise ValueError()
-                            print(f"start:{start_point_screen_coordinate}")
-                            print(f"end:{end_point_screen_coordinate}")
-                            draw_line(screen=screen, pygame_screen_size=PYGAME_SCREEN_SIZE, point1_screen_coordinate=start_point_screen_coordinate, point2_screen_coordinate=end_point_screen_coordinate, line_width=line.width, color=line.color)
-
-                    print("不定")
-                    pass
-                #ここまでがsの値で場合分けしたz方向の描画の計算
-
-                #ここはw方向クリッピング処理の離島
-                else:
-                    t = -np.dot(point2_camera_coordinate, camera_coordinate_axises["w"]) / np.dot((point1_camera_coordinate - point2_camera_coordinate), camera_coordinate_axises["w"])
-                    if 0 <= t <= 1:
-                        print("範囲内")
-                        point_camera_coordinate = t * point1_camera_coordinate + (1 - t) * point2_camera_coordinate
+                        t = -np.dot(point2_camera_coordinate, camera_coordinate_axises["w"]) / np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["w"])
+                        if 0 <= t <= 1: #線のどこかの点が視界立体の内側にある
+                            point_camera_coordinate = t * point1_camera_coordinate + (1 - t) * point2_camera_coordinate
+                            point_abs_coordinate = point_camera_coordinate + self.abs_coordinate
+                            point_abs_coordinates.append(point_abs_coordinate)
+                            point_radiuses.append(line.width)
+                            point_colors.append(line.color)
+                            print(2)
+                        else:
+                            #線のどの点も視界立体の内側にない
+                            pass
+                elif self.is_point_in_vision(point1_camera_coordinate) and not self.is_point_in_vision(point2_camera_coordinate): #始点だけがカメラ前方にある（終点は後方）
+                    s = -(np.cos(self.FOV) - np.dot(point2_camera_coordinate, camera_coordinate_axises["z"])) / np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["z"])
+                    if self.is_in_view_solid(point1_camera_coordinate) and self.is_in_view_solid(point2_camera_coordinate): #線の視点と終点が視界立体の内側にある
+                        start_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point1_camera_coordinate)
+                        point_camera_coordinate = s * point1_camera_coordinate + (1 - s) * point2_camera_coordinate
+                        point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point_camera_coordinate)
+                        start_point_abs_coordinate = point1_abs_coordinate
                         point_abs_coordinate = point_camera_coordinate + self.abs_coordinate
-                        point = Point(point_abs_coordinate, line.color, line.width)
-                        self.draw_point_sets_screen_coordinate(screen, pygame_screen_size, [[point]])
-                    else:
-                        print("範囲外")
+                        line_point1_screen_coordinates.append(start_point_screen_coordinate)
+                        line_point2_screen_coordinates.append(point_screen_coordinate)
+                        line_widthes.append(line.width)
+                        line_colors.append(line.color)
+                        point_abs_coordinates.append(start_point_abs_coordinate)
+                        point_abs_coordinates.append(point_abs_coordinate)
+                        point_radiuses.append(line.width)
+                        point_radiuses.append(line.width)
+                        point_colors.append(line.color)
+                        point_colors.append(line.color)
+                        print(3)
+                    elif not (self.is_in_view_solid(point1_camera_coordinate) or self.is_in_view_solid(point1_camera_coordinate)): #線の始点と終点の両方が視界立体の内側にない
+                        t = -np.dot(point2_camera_coordinate, camera_coordinate_axises["w"]) / np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["w"])
+                        if 0 <= t <= 1:
+                            point_camera_coordinate = t * point1_camera_coordinate + (1 - t) * point2_camera_coordinate
+                            if self.is_point_in_vision(point_camera_coordinate): #線のうちの、w=0の点がカメラ前方にある
+                                point_abs_coordinate = point_camera_coordinate + self.abs_coordinate
+                                point_abs_coordinates.append(point_abs_coordinate)
+                                point_radiuses.append(line.width)
+                                point_colors.append(line.color)
+                                print(4)
+                            else:
+                                #線のうちの、w=0の点がカメラ前方にない
+                                pass
+                        else:
+                            #線のどの点も視界立体の内側にない
+                            pass
+                    elif self.is_in_view_solid(point1_camera_coordinate):#線の始点だけが視界立体の内側にある
+                        if self.is_point_in_vision(point1_camera_coordinate):#線の始点がカメラ前方にある
+                            point_abs_coordinate = point1_abs_coordinate
+                            point_abs_coordinates.append(point_abs_coordinate)
+                            point_radiuses.append(line.width)
+                            point_colors.append(line.color)
+                            print(5)
+                        else:
+                            #線の始点がカメラ前方にない
+                            pass
+                    elif self.is_in_view_solid(point2_camera_coordinate):#線の終点だけが視界立体の内側にある
+                        if self.is_point_in_vision(point2_camera_coordinate):#線の終点がカメラ前方にある
+                            point_abs_coordinate = point2_abs_coordinate
+                            point_abs_coordinates.append(point_abs_coordinate)
+                            point_radiuses.append(line.width)
+                            point_colors.append(line.color)
+                            print(6)
+                        else:
+                            #線の終点がカメラ前方にないい
+                            pass
 
-def draw_point(screen, pygame_screen_size, point_screen_coordinates, point_radiuses, colors):
+        for point_screen_coordinate, point_radius, color in zip(point_abs_coordinates, point_radiuses, point_colors):
+            points.append(Point(abs_coordinate=point_screen_coordinate, color=color, radius=point_radius))
+        self.draw_point_sets_screen_coordinate(screen=screen, pygame_screen_size=pygame_screen_size, point_sets=[points])
+        draw_lines(screen=screen, pygame_screen_size=pygame_screen_size, point1_screen_coordinates=line_point1_screen_coordinates, point2_screen_coordinates=line_point2_screen_coordinates, line_widthes=line_widthes, colors=line_colors)
+
+
+
+
+
+
+
+def draw_points(screen, pygame_screen_size, point_screen_coordinates, point_radiuses, colors):
     surface = pygame.Surface(pygame_screen_size, pygame.SRCALPHA)
     for point_screen_coordinate, point_radius, color in zip(point_screen_coordinates, point_radiuses, colors):
         point_pygame_color = np.array(255 * color, dtype=np.uint8)
@@ -246,18 +296,17 @@ def draw_point(screen, pygame_screen_size, point_screen_coordinates, point_radiu
         pygame.draw.circle(surface, point_pygame_color, point_pygame_coordinate, point_radius)
     screen.blit(surface, (0, 0))
 
-def draw_line(screen, pygame_screen_size, point1_screen_coordinate,point2_screen_coordinate, line_width, color):
+def draw_lines(screen, pygame_screen_size, point1_screen_coordinates, point2_screen_coordinates, line_widthes, colors):
     surface = pygame.Surface(pygame_screen_size, pygame.SRCALPHA)
-    line_pygame_color = np.array(255 * color, dtype=np.uint8)
-    line_pygame_color = pygame.Color(list(line_pygame_color))
-    pygame_screen_width = pygame_screen_size[0]
-    point1_pygame_coordinate = pygame_screen_width * point1_screen_coordinate / 2 + (pygame_screen_size[0] / 2, -pygame_screen_size[1] / 2)
-    point1_pygame_coordinate[1] = -point1_pygame_coordinate[1]
-    point2_pygame_coordinate = pygame_screen_width * point2_screen_coordinate / 2 + (pygame_screen_size[0] / 2, -pygame_screen_size[1] / 2)
-    point2_pygame_coordinate[1] = -point2_pygame_coordinate[1]
-    print(f"point1:{point1_pygame_coordinate}")
-    print(f"point2:{point2_pygame_coordinate}")
-    pygame.draw.line(surface, line_pygame_color, point1_pygame_coordinate, point2_pygame_coordinate, width=line_width)
+    for point1_screen_coordinate, point2_screen_coordinate, line_width, color in zip(point1_screen_coordinates,point2_screen_coordinates, line_widthes, colors):
+        line_pygame_color = np.array(255 * color, dtype=np.uint8)
+        line_pygame_color = pygame.Color(list(line_pygame_color))
+        pygame_screen_width = pygame_screen_size[0]
+        point1_pygame_coordinate = pygame_screen_width * point1_screen_coordinate / 2 + (pygame_screen_size[0] / 2, -pygame_screen_size[1] / 2)
+        point1_pygame_coordinate[1] = -point1_pygame_coordinate[1]
+        point2_pygame_coordinate = pygame_screen_width * point2_screen_coordinate / 2 + (pygame_screen_size[0] / 2, -pygame_screen_size[1] / 2)
+        point2_pygame_coordinate[1] = -point2_pygame_coordinate[1]
+        pygame.draw.line(surface, line_pygame_color, point1_pygame_coordinate, point2_pygame_coordinate, width=line_width)
     screen.blit(surface, (0,0))
 
 def generate_points(n, radius=5):
@@ -283,28 +332,33 @@ point_sets = [
         Point(np.array((0.0, 2.0, -2.0, -2.0)), np.array((0.5,0.5,1)), 10),
         Point(np.array((0.0, -2.0, -2.0, -2.0)), np.array((1,0.5,0.5)), 10),
     ],
-    [Point(np.array((0.0,10*rng.random()-5,10*rng.random()-5,10*rng.random()-5)), rng.random(3), 5) for _ in range(100)]
+    #[Point(np.array((0.0,10*rng.random()-5,10*rng.random()-5,10*rng.random()-5)), rng.random(3), 5) for _ in range(100)]
 ]
 
 line_sets = [
     [
-        Line(Point(np.array((0,0,0,0)),np.array((1,1,1)),5),Point(np.array((0,0,1,0)),np.array((1,1,1)),5),np.array((1,1,1)),5),
+        #Line(Point(np.array((0,0,0,1)),np.array((1,1,1)),5),Point(np.array((0,0,1,1)),np.array((1,1,1)),5),np.array((1,1,1)),5),
+        Line(Point(np.array((0,0,0,1)),np.array((1,1,1)),5),Point(np.array((0,1,0,0)),np.array((1,1,1)),5),np.array((1,1,0)),5)
     ],
     #generate_lines(20)
 ]
 
-main_camera = Camera(np.array((0.0, 0.0, 0.0, 0.0)), [np.array((1.0, 0.0, 0.0, 0.0)), np.array((0.0, 1.0, 0.0, 0.0)), np.array((0.0, 0.0, 1.0, 0.0)), np.array((0.0, 0.0, 0.0, 1.0))], np.array((10, 10)), 20,0.8,  5)
+screen_aspect_ratio = np.array((1,1))
+
+main_camera = Camera(np.array((0.0, 0.0, 0.0, 0.0)), [np.array((1.0, 0.0, 0.0, 0.0)), np.array((0.0, 1.0, 0.0, 0.0)), np.array((0.0, 0.0, 1.0, 0.0)), np.array((0.0, 0.0, 0.0, 1.0))], screen_aspect_ratio, 20,80, 0.8,  1)
 
 rotate_speed = 0.02
 move_speed = 0.07
 
-PYGAME_SCREEN_SIZE = (800,800) #関数では横幅を基準とし、1とおく。
+PYGAME_SCREEN_WIDTH = 800
+
+pygame_screen_size = (PYGAME_SCREEN_WIDTH, PYGAME_SCREEN_WIDTH * screen_aspect_ratio[1] / screen_aspect_ratio[0]) #関数では横幅を基準とし、1とおく。
 
 PYGAME_BACKGROUND_COLOR = (40,40,40)
 
 pygame.init()
 
-screen = pygame.display.set_mode(PYGAME_SCREEN_SIZE, pygame.SRCALPHA)
+screen = pygame.display.set_mode(pygame_screen_size, pygame.SRCALPHA)
 
 pygame.time.Clock()
 
@@ -318,9 +372,9 @@ while True:
 
         key_get_pressed = pygame.key.get_pressed()
         #回転
-        if key_get_pressed[pygame.K_r]:
-            main_camera.rotate_with_PlaneWX(rotate_speed)
         if key_get_pressed[pygame.K_f]:
+            main_camera.rotate_with_PlaneWX(rotate_speed)
+        if key_get_pressed[pygame.K_r]:
             main_camera.rotate_with_PlaneWX(-rotate_speed)
         if key_get_pressed[pygame.K_e]:
             main_camera.rotate_with_PlaneWY(rotate_speed)
@@ -352,8 +406,8 @@ while True:
 
     #draw_point(screen=screen, pygame_screen_size=PYGAME_SCREEN_SIZE, point_screen_coordinate=np.array((0,0)), point_radius=10, color=np.array((1,1,1,0.5)))
     #draw_line(screen=screen, pygame_screen_size=PYGAME_SCREEN_SIZE, point1_screen_coordinate=np.array((-1,-1)), point2_screen_coordinate=np.array((1,1)), line_width=3, color=np.array((1,1,1,0.5)))
-    main_camera.draw_point_sets_screen_coordinate(screen=screen, pygame_screen_size=PYGAME_SCREEN_SIZE, point_sets=point_sets)
-    #main_camera.draw_line_sets_screen_coordinate(screen=screen, pygame_screen_size=PYGAME_SCREEN_SIZE, line_sets=line_sets)
+    main_camera.draw_point_sets_screen_coordinate(screen=screen, pygame_screen_size=pygame_screen_size, point_sets=point_sets)
+    main_camera.draw_line_sets_screen_coordinate(screen=screen, pygame_screen_size=pygame_screen_size, line_sets=line_sets)
 
     pygame.display.flip()
 
