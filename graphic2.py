@@ -146,7 +146,7 @@ class Camera:
         return point_screen_coordinate
 
     def is_point_in_vision(self, point_camera_coordinate): #カメラ前方(視野角内)
-        return np.dot(point_camera_coordinate, self.camera_coordinate_axises["z"]) / np.linalg.norm(point_camera_coordinate) > np.cos(self.FOV)
+        return np.dot(point_camera_coordinate, self.camera_coordinate_axises["z"]) / np.linalg.norm(point_camera_coordinate) > np.cos(self.FOV / 2)
 
     def is_in_view_solid(self, point_camera_coordinate):
         tolerance = 1e-6
@@ -219,7 +219,7 @@ class Camera:
                             #線のどの点も視界立体の内側にない
                             pass
                 elif self.is_point_in_vision(point1_camera_coordinate) and not self.is_point_in_vision(point2_camera_coordinate): #始点だけがカメラ前方にある（終点は後方）
-                    s = -(np.cos(self.FOV) - np.dot(point2_camera_coordinate, camera_coordinate_axises["z"])) / np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["z"])
+                    s = -(np.cos(self.FOV / 2) - np.dot(point2_camera_coordinate, camera_coordinate_axises["z"])) / np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["z"])
                     if self.is_in_view_solid(point1_camera_coordinate) and self.is_in_view_solid(point2_camera_coordinate): #線の視点と終点が視界立体の内側にある
                         start_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point1_camera_coordinate)
                         point_camera_coordinate = s * point1_camera_coordinate + (1 - s) * point2_camera_coordinate
@@ -345,7 +345,7 @@ line_sets = [
 
 screen_aspect_ratio = np.array((1,1))
 
-main_camera = Camera(np.array((0.0, 0.0, 0.0, 0.0)), [np.array((1.0, 0.0, 0.0, 0.0)), np.array((0.0, 1.0, 0.0, 0.0)), np.array((0.0, 0.0, 1.0, 0.0)), np.array((0.0, 0.0, 0.0, 1.0))], screen_aspect_ratio, 20,80, 0.8,  1)
+main_camera = Camera(np.array((0.0, 0.0, 0.0, 0.0)), [np.array((1.0, 0.0, 0.0, 0.0)), np.array((0.0, 1.0, 0.0, 0.0)), np.array((0.0, 0.0, 1.0, 0.0)), np.array((0.0, 0.0, 0.0, 1.0))], screen_aspect_ratio, 20, 160, 0.8,  1)
 
 rotate_speed = 0.02
 move_speed = 0.07
