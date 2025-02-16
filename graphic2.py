@@ -143,6 +143,7 @@ class Camera:
         point_screen_coordinate_y = np.dot(point_camera_coordinate,self.camera_coordinate_axises["y"]) * self.screen_distance / np.dot(point_camera_coordinate, self.camera_coordinate_axises["z"])
         point_screen_coordinate_y = point_screen_coordinate_y * 2 / self.screen_size[0]
         point_screen_coordinate = np.array((point_screen_coordinate_x, point_screen_coordinate_y))
+        print(f"in_func_CCSC: {np.dot(point_camera_coordinate, self.camera_coordinate_axises["z"])}")
         return point_screen_coordinate
 
     def is_point_in_vision(self, point_camera_coordinate): #カメラ前方(視野角内)
@@ -191,6 +192,7 @@ class Camera:
 
                 if self.is_point_in_vision(point1_camera_coordinate) and self.is_point_in_vision(point2_camera_coordinate): #線の始点と終点が両方視線ベクトル方向にある
                     if self.is_in_view_solid(point1_camera_coordinate) and self.is_in_view_solid(point2_camera_coordinate): #線の視点と終点が視界立体の内側にある
+                        print(point1_camera_coordinate, point2_camera_coordinate)
                         start_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point1_camera_coordinate)
                         end_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point2_camera_coordinate)
                         start_point_abs_coordinate = point1_abs_coordinate
@@ -219,60 +221,61 @@ class Camera:
                             #線のどの点も視界立体の内側にない
                             pass
                 elif self.is_point_in_vision(point1_camera_coordinate) and not self.is_point_in_vision(point2_camera_coordinate): #始点だけがカメラ前方にある（終点は後方）
-                    s = -(np.cos(self.FOV / 2) - np.dot(point2_camera_coordinate, camera_coordinate_axises["z"])) / np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["z"])
-                    if self.is_in_view_solid(point1_camera_coordinate) and self.is_in_view_solid(point2_camera_coordinate): #線の視点と終点が視界立体の内側にある
-                        start_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point1_camera_coordinate)
-                        point_camera_coordinate = s * point1_camera_coordinate + (1 - s) * point2_camera_coordinate
-                        point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point_camera_coordinate)
-                        start_point_abs_coordinate = point1_abs_coordinate
-                        point_abs_coordinate = point_camera_coordinate + self.abs_coordinate
-                        line_point1_screen_coordinates.append(start_point_screen_coordinate)
-                        line_point2_screen_coordinates.append(point_screen_coordinate)
-                        line_widthes.append(line.width)
-                        line_colors.append(line.color)
-                        point_abs_coordinates.append(start_point_abs_coordinate)
-                        point_abs_coordinates.append(point_abs_coordinate)
-                        point_radiuses.append(line.width)
-                        point_radiuses.append(line.width)
-                        point_colors.append(line.color)
-                        point_colors.append(line.color)
-                        print(3)
-                    elif not (self.is_in_view_solid(point1_camera_coordinate) or self.is_in_view_solid(point1_camera_coordinate)): #線の始点と終点の両方が視界立体の内側にない
-                        t = -np.dot(point2_camera_coordinate, camera_coordinate_axises["w"]) / np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["w"])
-                        if 0 <= t <= 1:
-                            point_camera_coordinate = t * point1_camera_coordinate + (1 - t) * point2_camera_coordinate
-                            if self.is_point_in_vision(point_camera_coordinate): #線のうちの、w=0の点がカメラ前方にある
-                                point_abs_coordinate = point_camera_coordinate + self.abs_coordinate
+                    s = (np.cos(self.FOV / 2) - np.dot(point2_camera_coordinate, camera_coordinate_axises["z"])) / np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["z"])
+                    if 0 <= s <= 1:
+                        if self.is_in_view_solid(point1_camera_coordinate) and self.is_in_view_solid(point2_camera_coordinate): #線の視点と終点が視界立体の内側にある
+                            start_point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point1_camera_coordinate)
+                            point_camera_coordinate = s * point1_camera_coordinate + (1 - s) * point2_camera_coordinate
+                            point_screen_coordinate = self.camera_coordinate_to_screen_coordinate(point_camera_coordinate)
+                            start_point_abs_coordinate = point1_abs_coordinate
+                            point_abs_coordinate = point_camera_coordinate + self.abs_coordinate
+                            line_point1_screen_coordinates.append(start_point_screen_coordinate)
+                            line_point2_screen_coordinates.append(point_screen_coordinate)
+                            line_widthes.append(line.width)
+                            line_colors.append(line.color)
+                            point_abs_coordinates.append(start_point_abs_coordinate)
+                            point_abs_coordinates.append(point_abs_coordinate)
+                            point_radiuses.append(line.width)
+                            point_radiuses.append(line.width)
+                            point_colors.append(line.color)
+                            point_colors.append(line.color)
+                            print(3)
+                        elif not (self.is_in_view_solid(point1_camera_coordinate) or self.is_in_view_solid(point1_camera_coordinate)): #線の始点と終点の両方が視界立体の内側にない
+                            t = -np.dot(point2_camera_coordinate, camera_coordinate_axises["w"]) / np.dot(point1_camera_coordinate - point2_camera_coordinate, camera_coordinate_axises["w"])
+                            if 0 <= t <= 1:
+                                point_camera_coordinate = t * point1_camera_coordinate + (1 - t) * point2_camera_coordinate
+                                if self.is_point_in_vision(point_camera_coordinate): #線のうちの、w=0の点がカメラ前方にある
+                                    point_abs_coordinate = point_camera_coordinate + self.abs_coordinate
+                                    point_abs_coordinates.append(point_abs_coordinate)
+                                    point_radiuses.append(line.width)
+                                    point_colors.append(line.color)
+                                    print(4)
+                                else:
+                                    #線のうちの、w=0の点がカメラ前方にない
+                                    pass
+                            else:
+                                #線のどの点も視界立体の内側にない
+                                pass
+                        elif self.is_in_view_solid(point1_camera_coordinate):#線の始点だけが視界立体の内側にある
+                            if self.is_point_in_vision(point1_camera_coordinate):#線の始点がカメラ前方にある
+                                point_abs_coordinate = point1_abs_coordinate
                                 point_abs_coordinates.append(point_abs_coordinate)
                                 point_radiuses.append(line.width)
                                 point_colors.append(line.color)
-                                print(4)
+                                print(5)
                             else:
-                                #線のうちの、w=0の点がカメラ前方にない
+                                #線の始点がカメラ前方にない
                                 pass
-                        else:
-                            #線のどの点も視界立体の内側にない
-                            pass
-                    elif self.is_in_view_solid(point1_camera_coordinate):#線の始点だけが視界立体の内側にある
-                        if self.is_point_in_vision(point1_camera_coordinate):#線の始点がカメラ前方にある
-                            point_abs_coordinate = point1_abs_coordinate
-                            point_abs_coordinates.append(point_abs_coordinate)
-                            point_radiuses.append(line.width)
-                            point_colors.append(line.color)
-                            print(5)
-                        else:
-                            #線の始点がカメラ前方にない
-                            pass
-                    elif self.is_in_view_solid(point2_camera_coordinate):#線の終点だけが視界立体の内側にある
-                        if self.is_point_in_vision(point2_camera_coordinate):#線の終点がカメラ前方にある
-                            point_abs_coordinate = point2_abs_coordinate
-                            point_abs_coordinates.append(point_abs_coordinate)
-                            point_radiuses.append(line.width)
-                            point_colors.append(line.color)
-                            print(6)
-                        else:
-                            #線の終点がカメラ前方にないい
-                            pass
+                        elif self.is_in_view_solid(point2_camera_coordinate):#線の終点だけが視界立体の内側にある
+                            if self.is_point_in_vision(point2_camera_coordinate):#線の終点がカメラ前方にある
+                                point_abs_coordinate = point2_abs_coordinate
+                                point_abs_coordinates.append(point_abs_coordinate)
+                                point_radiuses.append(line.width)
+                                point_colors.append(line.color)
+                                print(6)
+                            else:
+                                #線の終点がカメラ前方にないい
+                                pass
 
         for point_screen_coordinate, point_radius, color in zip(point_abs_coordinates, point_radiuses, point_colors):
             points.append(Point(abs_coordinate=point_screen_coordinate, color=color, radius=point_radius))
@@ -338,7 +341,7 @@ point_sets = [
 line_sets = [
     [
         #Line(Point(np.array((0,0,0,1)),np.array((1,1,1)),5),Point(np.array((0,0,1,1)),np.array((1,1,1)),5),np.array((1,1,1)),5),
-        Line(Point(np.array((0,0,0,1)),np.array((1,1,1)),5),Point(np.array((0,1,0,0)),np.array((1,1,1)),5),np.array((1,1,0)),5)
+        Line(Point(np.array((0.0,0.0,0.0,1.0)),np.array((1,1,1)),5),Point(np.array((0.0,1.0,0.0,0.0)),np.array((1,1,1)),5),np.array((1,1,0)),5)
     ],
     #generate_lines(20)
 ]
