@@ -4,9 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0579333e-5e79-465e-ab9c-de7ad6990942" name="変更" comment="線描画大規模変更前">
+    <list default="true" id="0579333e-5e79-465e-ab9c-de7ad6990942" name="変更" comment="近づきすぎたとき線の向きが変わる問題&#10;未修整">
+      <change afterPath="$PROJECT_DIR$/graphic3.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/graphic2.py" beforeDir="false" afterPath="$PROJECT_DIR$/graphic2.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -52,6 +53,7 @@
     "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "Python.graphic.executor": "Run",
     "Python.graphic2.executor": "Run",
+    "Python.test.executor": "Run",
     "Python.vox_generator.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
@@ -108,7 +110,31 @@
       <option name="project" value="LOCAL" />
       <updated>1739449580343</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="近づきすぎたとき線の向きが変わる問題&#10;未修整">
+      <option name="closed" value="true" />
+      <created>1739460583716</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1739460583716</updated>
+    </task>
+    <task id="LOCAL-00005" summary="近づきすぎたとき線の向きが変わる問題&#10;未修整">
+      <option name="closed" value="true" />
+      <created>1739460601361</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1739460601361</updated>
+    </task>
+    <task id="LOCAL-00006" summary="近づきすぎたとき線の向きが変わる問題&#10;未修整">
+      <option name="closed" value="true" />
+      <created>1739666646019</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1739666646019</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -126,6 +152,7 @@
     <MESSAGE value="4d" />
     <MESSAGE value="線描画&#10;tが[0,1]に属する時のみ実装完了" />
     <MESSAGE value="線描画大規模変更前" />
-    <option name="LAST_COMMIT_MESSAGE" value="線描画大規模変更前" />
+    <MESSAGE value="近づきすぎたとき線の向きが変わる問題&#10;未修整" />
+    <option name="LAST_COMMIT_MESSAGE" value="近づきすぎたとき線の向きが変わる問題&#10;未修整" />
   </component>
 </project>
